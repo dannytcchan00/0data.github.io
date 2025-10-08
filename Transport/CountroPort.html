@@ -2,22 +2,88 @@
 <html lang="zh-HK">
 <head>
 <meta charset="UTF-8" />
-<title>香港出入境實時數據</title>
+<title>香港出入境實時數據 - 暗黑主題</title>
 <style>
-  body { font-family: Arial, sans-serif; margin: 20px; }
-  h1, h2 { text-align: center; }
-  #date-range { margin-top: 30px; display: flex; justify-content: center; gap: 10px; }
-  input[type="date"] { padding: 5px; }
-  button { padding: 6px 15px; cursor: pointer; }
-  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-  th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-  th { background-color: #f2f2f2; }
-  #top-summary { margin-top: 20px; }
+  /* 暗黑主題樣式 */
+  body {
+    background-color: #121212;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 20px;
+  }
+  h1, h2 {
+    text-align: center;
+    color: #fafafa;
+  }
+  #date-range {
+    margin-top: 30px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    align-items: center;
+  }
+  label {
+    font-weight: 600;
+  }
+  input[type="date"] {
+    padding: 7px;
+    border-radius: 6px;
+    border: none;
+    background-color: #1f1f1f;
+    color: #fafafa;
+    font-size: 14px;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+  button {
+    padding: 8px 18px;
+    background-color: #2979ff;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  button:hover {
+    background-color: #5393ff;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: center;
+  }
+  th {
+    background-color: #272727;
+    font-weight: 700;
+    border-bottom: 2px solid #444;
+    color: #bb86fc;
+  }
+  td {
+    border-bottom: 1px solid #333;
+  }
+  tr:hover td {
+    background-color: #333;
+  }
+  #results p {
+    text-align: center;
+    font-style: italic;
+    margin-top: 20px;
+    color: #ddd;
+  }
 </style>
 </head>
 <body>
 
-<h1>香港出入境實時數據</h1>
+<h1>香港出入境實時數據 (暗黑主題)</h1>
 
 <div id="top-summary">
   <h2>最新日期（<span id="latest-date"></span>）出入境總覽</h2>
@@ -40,10 +106,8 @@
 </div>
 
 <div id="date-range">
-  <div>
-    <label for="pick-date">選擇日期:</label>
-    <input type="date" id="pick-date" />
-  </div>
+  <label for="pick-date">選擇日期:</label>
+  <input type="date" id="pick-date" />
   <button onclick="showSelectedDateData()">查詢</button>
 </div>
 
@@ -51,128 +115,129 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
-const csvUrl = "https://www.immd.gov.hk/opendata/hkt/transport/immigration_clearance/statistics_on_daily_passenger_traffic.csv";
+  const csvUrl = "https://www.immd.gov.hk/opendata/hkt/transport/immigration_clearance/statistics_on_daily_passenger_traffic.csv";
 
-// 轉換DD-MM-YYYY至YYYY-MM-DD
-function convertDateFormat(ddmmyyyy) {
-  const parts = ddmmyyyy.split("-");
-  if(parts.length!==3) return ddmmyyyy;
-  return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-}
-
-async function fetchData() {
-  const response = await fetch(csvUrl);
-  const csvText = await response.text();
-  return new Promise(resolve => {
-    Papa.parse(csvText, {
-      header:true,
-      skipEmptyLines: true,
-      complete: results => {
-        const data = results.data.map(row => ({
-          date: convertDateFormat(row['日期']),
-          port: row['管制站'],
-          type: row['入境 / 出境'],
-          hk: +row['香港居民'] || 0,
-          mainland: +row['內地訪客'] || 0,
-          other: +row['其他訪客'] || 0,
-          total: +row['總計'] || 0
-        }));
-        resolve(data);
-      }
-    });
-  });
-}
-
-let allData = [];
-
-async function init() {
-  allData = await fetchData();
-  showLatestSummary();
-  const dates = Array.from(new Set(allData.map(d=>d.date))).sort();
-  document.getElementById("pick-date").value = dates[dates.length - 1];
-  showSelectedDateData();
-}
-
-function showLatestSummary() {
-  const dates = Array.from(new Set(allData.map(d => d.date))).sort();
-  const latestDate = dates[dates.length-1];
-  document.getElementById("latest-date").innerText = latestDate;
-
-  const dailyData = allData.filter(d => d.date === latestDate);
-  const ports = Array.from(new Set(dailyData.map(d => d.port)));
-
-  const rows = ports.map(port => {
-    const inData = dailyData.find(d => d.port === port && d.type === "入境") || {};
-    const outData = dailyData.find(d => d.port === port && d.type === "出境") || {};
-    return {
-      port,
-      in_hk: inData.hk || 0,
-      in_mainland: inData.mainland || 0,
-      in_other: inData.other || 0,
-      in_total: inData.total || 0,
-      out_hk: outData.hk || 0,
-      out_mainland: outData.mainland || 0,
-      out_other: outData.other || 0,
-      out_total: outData.total || 0,
-    };
-  });
-
-  let html = "";
-  rows.forEach(r => {
-    html += `<tr>
-      <td>${r.port}</td>
-      <td>${r.in_hk}</td>
-      <td>${r.in_mainland}</td>
-      <td>${r.in_other}</td>
-      <td>${r.in_total}</td>
-      <td>${r.out_hk}</td>
-      <td>${r.out_mainland}</td>
-      <td>${r.out_other}</td>
-      <td>${r.out_total}</td>
-    </tr>`;
-  });
-
-  document.getElementById("latest-summary-body").innerHTML = html;
-}
-
-function showSelectedDateData() {
-  const selDate = document.getElementById("pick-date").value;
-  const filtered = allData.filter(d => d.date === selDate);
-  if(filtered.length===0) {
-    document.getElementById("results").innerHTML = "<p>無符合條件嘅數據</p>";
-    return;
+  function convertDateFormat(ddmmyyyy) {
+    const parts = ddmmyyyy.split("-");
+    if(parts.length !== 3) return ddmmyyyy;
+    return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
   }
 
-  filtered.sort((a,b) => a.port.localeCompare(b.port) || a.type.localeCompare(b.type));
+  async function fetchData() {
+    const response = await fetch(csvUrl);
+    const csvText = await response.text();
+    return new Promise(resolve => {
+      Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+        complete: results => {
+          const data = results.data.map(row => ({
+            date: convertDateFormat(row['日期']),
+            port: row['管制站'],
+            type: row['入境 / 出境'],
+            hk: +row['香港居民'] || 0,
+            mainland: +row['內地訪客'] || 0,
+            other: +row['其他訪客'] || 0,
+            total: +row['總計'] || 0
+          }));
+          resolve(data);
+        }
+      });
+    });
+  }
 
-  let html = `<h2>日期: ${selDate} 出入境數據</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>關口</th><th>入境/出境</th>
-          <th>香港居民</th><th>內地訪客</th>
-          <th>其他訪客</th><th>總計</th>
-        </tr>
-      </thead>
-      <tbody>`;
+  let allData = [];
 
-  filtered.forEach(d => {
-    html += `<tr>
-      <td>${d.port}</td>
-      <td>${d.type}</td>
-      <td>${d.hk}</td>
-      <td>${d.mainland}</td>
-      <td>${d.other}</td>
-      <td>${d.total}</td>
-    </tr>`;
-  });
+  async function init() {
+    allData = await fetchData();
+    showLatestSummary();
+    const dates = Array.from(new Set(allData.map(d => d.date))).sort();
+    if(dates.length > 0) {
+      document.getElementById("pick-date").value = dates[dates.length - 1];
+    }
+    showSelectedDateData();
+  }
 
-  html += `</tbody></table>`;
+  function showLatestSummary() {
+    const dates = Array.from(new Set(allData.map(d => d.date))).sort();
+    const latestDate = dates[dates.length - 1];
+    document.getElementById("latest-date").innerText = latestDate;
 
-  document.getElementById("results").innerHTML = html;
-}
+    const dailyData = allData.filter(d => d.date === latestDate);
+    const ports = Array.from(new Set(dailyData.map(d => d.port)));
 
-window.onload = init;
+    const rows = ports.map(port => {
+      const inData = dailyData.find(d => d.port === port && d.type === "入境") || {};
+      const outData = dailyData.find(d => d.port === port && d.type === "出境") || {};
+      return {
+        port,
+        in_hk: inData.hk || 0,
+        in_mainland: inData.mainland || 0,
+        in_other: inData.other || 0,
+        in_total: inData.total || 0,
+        out_hk: outData.hk || 0,
+        out_mainland: outData.mainland || 0,
+        out_other: outData.other || 0,
+        out_total: outData.total || 0
+      };
+    });
+
+    let html = "";
+    rows.forEach(r => {
+      html += `<tr>
+        <td>${r.port}</td>
+        <td>${r.in_hk}</td>
+        <td>${r.in_mainland}</td>
+        <td>${r.in_other}</td>
+        <td>${r.in_total}</td>
+        <td>${r.out_hk}</td>
+        <td>${r.out_mainland}</td>
+        <td>${r.out_other}</td>
+        <td>${r.out_total}</td>
+      </tr>`;
+    });
+
+    document.getElementById("latest-summary-body").innerHTML = html;
+  }
+
+  function showSelectedDateData() {
+    const selDate = document.getElementById("pick-date").value;
+    const filtered = allData.filter(d => d.date === selDate);
+    if(filtered.length === 0) {
+      document.getElementById("results").innerHTML = "<p>無符合條件嘅數據</p>";
+      return;
+    }
+
+    filtered.sort((a,b) => a.port.localeCompare(b.port) || a.type.localeCompare(b.type));
+
+    let html = `<h2>日期: ${selDate} 出入境數據</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>關口</th><th>入境/出境</th>
+            <th>香港居民</th><th>內地訪客</th>
+            <th>其他訪客</th><th>總計</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    filtered.forEach(d => {
+      html += `<tr>
+        <td>${d.port}</td>
+        <td>${d.type}</td>
+        <td>${d.hk}</td>
+        <td>${d.mainland}</td>
+        <td>${d.other}</td>
+        <td>${d.total}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table>`;
+
+    document.getElementById("results").innerHTML = html;
+  }
+
+  window.onload = init;
 </script>
 
 </body>
