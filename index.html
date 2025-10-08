@@ -1,124 +1,125 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-HK">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>带子菜单的菜单栏示例</title>
-  <style>
-    body, html {
-      margin: 0; padding: 0;
-      font-family: Arial, sans-serif;
-      height: 100%;
-    }
-    #menu-bar {
-      background-color: #333;
-      color: white;
-      display: flex;
-      padding: 10px;
-    }
-    /* 主菜单样式 */
-    #menu-bar > ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-    }
-    #menu-bar > ul > li {
-      position: relative;
-    }
-    #menu-bar > ul > li > button {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 16px;
-      padding: 10px 20px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-    #menu-bar > ul > li > button:hover,
-    #menu-bar > ul > li > button.active {
-      background-color: #555;
-    }
-    /* 子菜单样式 */
-    #menu-bar ul ul {
-      display: none;
-      position: absolute;
-      top: 40px;
-      left: 0;
-      background-color: #444;
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      min-width: 200px;
-      z-index: 1000;
-      border-radius: 0 0 4px 4px;
-    }
-    #menu-bar ul ul li button {
-      display: block;
-      width: 100%;
-      padding: 10px;
-      color: white;
-      background: none;
-      border: none;
-      text-align: left;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background-color 0.3s;
-    }
-    #menu-bar ul ul li button:hover {
-      background-color: #666;
-    }
-    /* 显示子菜单 */
-    #menu-bar ul li:hover > ul {
-      display: block;
-    }
-    /* 内容区 */
-    #content-area {
-      height: calc(100% - 50px);
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>多層下拉與iframe示範網站</title>
+<style>
+  body {
+    font-family: Arial, sans-serif; background: #121212; color: #eee; margin: 0; padding: 0;
+    display: flex; flex-direction: column; height: 100vh;
+  }
+  .menu-bar {
+    background-color: #333; display: flex; padding: 10px 20px;
+    flex-shrink: 0;
+    align-items: center;
+  }
+  .menu-item {
+    position: relative; margin-right: 20px;
+  }
+  .menu-item > button, .menu-item > a {
+    background: none; border: none; color: white; font-size: 16px; cursor: pointer; padding: 10px 15px;
+    text-decoration: none; display: block;
+  }
+  .menu-item > button:hover, .menu-item:hover > button, .menu-item:hover > a {
+    background-color: #555;
+  }
+  /* 下拉選單 */
+  .dropdown, .dropdown-sub {
+    display: none; position: absolute; background-color: #444; top: 40px; min-width: 180px; z-index: 1000; border-radius: 4px;
+  }
+  .dropdown-sub {
+    top: 0; left: 100%; margin-left: 2px;
+  }
+  .dropdown button, .dropdown a, .dropdown-sub button, .dropdown-sub a {
+    width: 100%; padding: 10px 15px; text-align: left; background: none; border: none; color: white; cursor: pointer; font-size: 14px;
+    display: block; text-decoration: none;
+  }
+  .dropdown button:hover, .dropdown a:hover, .dropdown-sub button:hover, .dropdown-sub a:hover {
+    background-color: #666;
+  }
+
+  /* hover 展開下拉 */
+  .menu-item:hover > .dropdown {
+    display: block;
+  }
+  .dropdown .menu-item:hover > .dropdown-sub {
+    display: block;
+  }
+
+  #hkTime {
+    margin-left: auto;
+    font-size: 14px;
+    color: #ccc;
+    white-space: nowrap;
+  }
+
+  iframe#contentFrame {
+    flex-grow: 1;
+    border: none;
+    width: 100%;
+    height: calc(100vh - 60px);
+    background: white;
+    color: black;
+  }
+</style>
 </head>
 <body>
-  <div id="menu-bar">
-    <ul>
-      <li><button data-src="home.html" class="active">首頁</button></li>
-      <li>
-        <button>運輸</button>
-        <ul>
-          <li><button>交通</button></li>
-          <li><button data-src="https://dannytcchan00.github.io/0data.github.io/transport/countroPort.html">渡輪</button></li>
-        </ul>
-      </li>
-      <li><button data-src="https://dannytcchan00.github.io/0data.github.io/weather/weather.html">天氣</button></li>
-      <li><button data-src="about.html">關於</button></li>
-    </ul>
+
+<div class="menu-bar">
+  <div class="menu-item">
+    <button onclick="loadPage('home.html')">首頁</button>
   </div>
-  <div id="content-area">
-    <iframe id="iframe-content" src="home.html"></iframe>
+  <div class="menu-item">
+    <button>運輸 ▼</button>
+    <div class="dropdown">
+      <div class="menu-item" style="position:relative;">
+        <button>公共交通 ▶</button>
+        <div class="dropdown-sub">
+          <div class="menu-item" style="position:relative;">
+            <button>渡輪 ▶</button>
+            <div class="dropdown-sub">
+              <a href="#" onclick="loadPage('pengchau.html'); return false;">坪洲</a>
+              <a href="#" onclick="loadPage('cheungchau.html'); return false;">長洲</a>
+              <a href="#" onclick="loadPage('lanyap.html'); return false;">南丫島</a>
+            </div>
+          </div>
+          <a href="#" onclick="loadPage('bus.html'); return false;">巴士</a>
+          <a href="#" onclick="loadPage('mtr.html'); return false;">地鐵</a>
+        </div>
+      </div>
+      <a href="#" onclick="loadPage('taxi.html'); return false;">出租車</a>
+      <a href="#" onclick="loadPage('privatecar.html'); return false;">私家車</a>
+    </div>
   </div>
+  <div class="menu-item">
+    <button onclick="loadPage('border.html')">每日出入境人数</button>
+  </div>
+  <div class="menu-item">
+    <button onclick="loadPage('//weather/weather.html')">天氣</button>
+  </div>
+  <div class="menu-item">
+    <button onclick="loadPage('about.html')">關於</button>
+  </div>
+  <div id="hkTime"></div>
+</div>
 
-  <script>
-    // 所有带data-src的按钮点击切换iframe页面
-    const buttons = document.querySelectorAll('#menu-bar button[data-src]');
-    const iframe = document.getElementById('iframe-content');
+<iframe id="contentFrame" src="home.html" title="內容顯示區"></iframe>
 
-    buttons.forEach(button => {
-      button.addEventListener('click', () => {
-        buttons.forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
+<script>
+  function loadPage(url) {
+    document.getElementById('contentFrame').src = url;
+  }
 
-        const src = button.getAttribute('data-src');
-        iframe.src = src;
-      });
-    });
+  function updateHKTime() {
+    const options = { timeZone: 'Asia/Hong_Kong', year:'numeric', month:'2-digit', day:'2-digit',
+                      hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false };
+    const hkDate = new Date().toLocaleString('zh-HK', options);
+    document.getElementById('hkTime').textContent = hkDate;
+  }
+  setInterval(updateHKTime, 1000);
+  updateHKTime();
+</script>
 
-    // 给没有data-src的主菜单“运输”按钮添加点击后控制子菜单显示（可选）
-    // 这里用CSS的hover已经实现悬浮显示子菜单，如果想点击显示可再加JS
-  </script>
 </body>
 </html>
