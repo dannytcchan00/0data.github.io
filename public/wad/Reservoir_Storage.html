@@ -1,0 +1,368 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>香港水塘即時儲水量</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #1a1a1a; 
+            color: #e0e0e0; 
+            height: 100vh;
+            overflow: hidden;
+        }
+        #map { 
+            width: 100%; 
+            height: 100vh; 
+        }
+        .info-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            width: 300px;
+            height: 80%;
+            background-color: rgba(42, 42, 42, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            z-index: 1000;
+            overflow-y: auto;
+            pointer-events: auto;
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(42, 42, 42, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            z-index: 1000;
+        }
+        .legend h3 { 
+            color: #fff; 
+            margin: 0 0 10px 0; 
+            font-size: 14px;
+        }
+        .legend ul { 
+            list-style: none; 
+            margin: 0; 
+            padding: 0; 
+        }
+        .legend li { 
+            margin-bottom: 5px; 
+            color: #ccc; 
+            font-size: 12px;
+        }
+        .legend-dot, .row-dot {
+            font-size: 16px;
+            margin-right: 5px;
+            line-height: 1;
+        }
+        .low-dot { color: #ff4444; }
+        .mid-dot { color: #ffaa00; }
+        .high-dot { color: #44ff44; }
+        .full-dot { color: #4444ff; }
+        .total { 
+            font-weight: bold; 
+            color: #4caf50; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 10px; 
+        }
+        th, td { 
+            border: 1px solid #444; 
+            padding: 8px; 
+            text-align: left; 
+        }
+        th { 
+            background-color: #333; 
+        }
+        .loading { color: #ccc; }
+        .custom-tooltip {
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            padding: 2px 5px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        @media (max-width: 768px) {
+            .info-panel {
+                position: static;
+                width: 100%;
+                height: 40%;
+                margin: 0;
+                border-radius: 0;
+            }
+            #map { height: 60%; }
+            .legend { position: static; margin: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="info-panel">
+        <h1>🌊 香港水塘即時儲水量</h1>
+        <p id="updateDate">最後更新: 載入中...</p>
+        <p id="totalInfo" class="total loading">總儲水量: 載入中...</p>
+
+        <table id="reservoirTable">
+            <thead>
+                <tr>
+                    <th>水位</th>
+                    <th>水塘名稱</th>
+                    <th>儲水量 (百萬立方米)</th>
+                    <th>滿水位 (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 數據會由JS動態填充 -->
+            </tbody>
+        </table>
+    </div>
+    <div class="legend">
+        <h3>水位分類</h3>
+        <ul>
+            <li><span class="legend-dot low-dot">●</span>低水位 (&lt; 50%)</li>
+            <li><span class="legend-dot mid-dot">●</span>中水位 (50-75%)</li>
+            <li><span class="legend-dot high-dot">●</span>高水位 (75-95%)</li>
+            <li><span class="legend-dot full-dot">●</span>滿水位 (&gt; 95%)</li>
+        </ul>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 固定容量數據（用於計算總量）
+        const capacities = {
+            '薄扶林水塘': 0.233,
+            '香港仔下水塘': 0.486,
+            '香港仔上水塘': 0.773,
+            '大潭濾水塘': 0.080,
+            '大潭中水塘': 0.686,
+            '大潭篤水塘': 6.047,
+            '大潭上水塘': 1.490,
+            '石崗水塘': 24.461,
+            '九龍濾水塘': 0.800,
+            '九龍水塘': 1.578,
+            '石梨貝水塘': 0.374,
+            '城門下水塘': 4.299,
+            '九龍接收水塘': 0.121,
+            '城門水塘': 13.279,
+            '大欖涌水塘': 20.490,
+            '船灣淡水湖': 229.729,
+            '萬宜水庫': 281.124
+        };
+
+        // 中英名稱映射
+        const nameMap = {
+            'Pok Fu Lam Reservoir': '薄扶林水塘',
+            'Aberdeen Lower Reservoir': '香港仔下水塘',
+            'Aberdeen Upper Reservoir': '香港仔上水塘',
+            'Tai Tam Byewash Reservoir': '大潭濾水塘',
+            'Tai Tam Intermediate Reservoir': '大潭中水塘',
+            'Tai Tam Tuk Reservoir': '大潭篤水塘',
+            'Tai Tam Upper Reservoir': '大潭上水塘',
+            'Shek Pik Reservoir': '石崗水塘',
+            'Kowloon Byewash Reservoir': '九龍濾水塘',
+            'Kowloon Reservoir': '九龍水塘',
+            'Shek Lei Pui Reservoir': '石梨貝水塘',
+            'Lower Shing Mun Reservoir': '城門下水塘',
+            'Kowloon Reception Reservoir': '九龍接收水塘',
+            'Shing Mun Reservoir': '城門水塘',
+            'Tai Lam Chung Reservoir': '大欖涌水塘',
+            'Plover Cove Reservoir': '船灣淡水湖',
+            'High Island Reservoir': '萬宜水庫'
+        };
+
+        // 座標數據
+        const coords = {
+            '薄扶林水塘': {lat: 22.265, lng: 114.137},
+            '香港仔下水塘': {lat: 22.251, lng: 114.190},
+            '香港仔上水塘': {lat: 22.255, lng: 114.185},
+            '大潭濾水塘': {lat: 22.256, lng: 114.212},
+            '大潭中水塘': {lat: 22.246, lng: 114.210},
+            '大潭篤水塘': {lat: 22.243, lng: 114.220},
+            '大潭上水塘': {lat: 22.260, lng: 114.210},
+            '石崗水塘': {lat: 22.228, lng: 113.895},
+            '九龍濾水塘': {lat: 22.350, lng: 114.150},
+            '九龍水塘': {lat: 22.354, lng: 114.153},
+            '石梨貝水塘': {lat: 22.350, lng: 114.130},
+            '城門下水塘': {lat: 22.373, lng: 114.159},
+            '九龍接收水塘': {lat: 22.350, lng: 114.150},
+            '城門水塘': {lat: 22.386, lng: 114.147},
+            '大欖涌水塘': {lat: 22.384, lng: 114.031},
+            '船灣淡水湖': {lat: 22.471, lng: 114.253},
+            '萬宜水庫': {lat: 22.375, lng: 114.351}
+        };
+
+        // Fallback數據（最新官方2025-09-16）
+        const fallbackData = [
+            {name: '薄扶林水塘', storage: 0.181, capacity: 0.233, percent: 77.68, cls: 'high'},
+            {name: '香港仔下水塘', storage: 0.486, capacity: 0.486, percent: 100.00, cls: 'full'},
+            {name: '香港仔上水塘', storage: 0.773, capacity: 0.773, percent: 100.00, cls: 'full'},
+            {name: '大潭濾水塘', storage: 0.080, capacity: 0.080, percent: 100.00, cls: 'full'},
+            {name: '大潭中水塘', storage: 0.683, capacity: 0.686, percent: 99.56, cls: 'high'},
+            {name: '大潭篤水塘', storage: 6.019, capacity: 6.047, percent: 99.54, cls: 'high'},
+            {name: '大潭上水塘', storage: 1.463, capacity: 1.490, percent: 98.19, cls: 'high'},
+            {name: '石崗水塘', storage: 24.461, capacity: 24.461, percent: 100.00, cls: 'full'},
+            {name: '九龍濾水塘', storage: 0.450, capacity: 0.800, percent: 56.25, cls: 'mid'},
+            {name: '九龍水塘', storage: 1.284, capacity: 1.578, percent: 81.37, cls: 'high'},
+            {name: '石梨貝水塘', storage: 0.374, capacity: 0.374, percent: 100.00, cls: 'full'},
+            {name: '城門下水塘', storage: 0.801, capacity: 4.299, percent: 18.63, cls: 'low'},
+            {name: '九龍接收水塘', storage: 0.121, capacity: 0.121, percent: 100.00, cls: 'full'},
+            {name: '城門水塘', storage: 11.693, capacity: 13.279, percent: 88.06, cls: 'high'},
+            {name: '大欖涌水塘', storage: 18.854, capacity: 20.490, percent: 92.02, cls: 'high'},
+            {name: '船灣淡水湖', storage: 209.215, capacity: 229.729, percent: 91.07, cls: 'high'},
+            {name: '萬宜水庫', storage: 222.908, capacity: 281.124, percent: 79.29, cls: 'mid'}
+        ];
+
+        // 初始化地圖
+        var map = L.map('map').setView([22.3, 114.2], 11);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors © CARTO'
+        }).addTo(map);
+
+        var markers = {};
+        var reservoirs = []; // 儲存數據
+
+        // 顏色映射同分類函數
+        var colors = {low: '#ff4444', mid: '#ffaa00', high: '#44ff44', full: '#4444ff'};
+        function getClass(percent) {
+            if (percent < 50) return 'low';
+            if (percent < 75) return 'mid';
+            if (percent <= 95) return 'high';
+            return 'full';
+        }
+        function getDotClass(cls) { return cls + '-dot'; }
+        function getCoords(name) {
+            return coords[name] || {lat: 22.3, lng: 114.2};
+        }
+
+        // 更新DOM函數
+        function updateDOM(data) {
+            const totalStorage = data.reduce((sum, res) => sum + res.storage, 0);
+            const totalCapacity = Object.values(capacities).reduce((a, b) => a + b, 0);
+            const totalPercent = (totalStorage / totalCapacity * 100).toFixed(2);
+
+            document.getElementById('updateDate').textContent = `最後更新: ${new Date().toLocaleString('zh-TW')}`;
+            document.getElementById('totalInfo').innerHTML = `總儲水量: ${totalStorage.toFixed(3)} / ${totalCapacity.toFixed(3)} 百萬立方米 (${totalPercent}%)`;
+
+            // 更新表格
+            const tbody = document.querySelector('#reservoirTable tbody');
+            tbody.innerHTML = '';
+            data.forEach(res => {
+                const row = `<tr>
+                    <td><span class="row-dot ${getDotClass(res.cls)}">●</span></td>
+                    <td>${res.name}</td>
+                    <td>${res.storage.toFixed(3)}</td>
+                    <td>${res.percent.toFixed(2)}%</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+
+            // 更新地圖
+            updateMap(data);
+        }
+
+        // 更新地圖marker（加恆常tooltip顯示名字+ %）
+        function updateMap(data) {
+            Object.values(markers).forEach(m => map.removeLayer(m));
+            markers = {};
+
+            data.forEach(function(res) {
+                const latlng = getCoords(res.name);
+                var marker = L.circleMarker([latlng.lat, latlng.lng], {
+                    radius: 6,
+                    fillColor: colors[res.cls],
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map);
+
+                // 恆常tooltip：顯示名字 + %
+                var tooltipContent = `${res.name}<br>${res.percent.toFixed(2)}%`;
+                marker.bindTooltip(tooltipContent, {
+                    permanent: true,
+                    direction: 'top',
+                    offset: [0, -10],
+                    className: 'custom-tooltip'
+                });
+
+                // 點擊popup顯示詳細資料
+                var popupContent = '<b>' + res.name + '</b><br>' +
+                                   '儲水量: ' + res.storage.toFixed(3) + ' Mm³<br>' +
+                                   '滿水位: ' + res.percent.toFixed(2) + '%';
+                marker.bindPopup(popupContent);
+                markers[res.name] = marker;
+            });
+        }
+
+        // fetch數據函數（加fallback）
+        async function fetchData() {
+            try {
+                const proxyUrl = 'https://corsproxy.io/?';
+                const url = 'https://www.wsd.gov.hk/en/core-businesses/operation-and-maintenance-of-waterworks/waterworks/current-storage-position-of-impounding-reservoirs/index.html';
+                console.log('Fetching from:', proxyUrl + encodeURIComponent(url));
+                const response = await fetch(proxyUrl + encodeURIComponent(url));
+                if (!response.ok) throw new Error('HTTP error: ' + response.status);
+                const htmlText = await response.text();
+                console.log('HTML fetched, length:', htmlText.length);
+                const html = new DOMParser().parseFromString(htmlText, 'text/html');
+
+                const table = html.querySelector('table');
+                if (!table) throw new Error('表格未找到');
+                const rows = table.querySelectorAll('tr');
+                let fetchedData = [];
+                let totalStorage = 0;
+
+                for (let i = 1; i < rows.length; i++) {
+                    const cells = rows[i].querySelectorAll('td');
+                    if (cells.length >= 3) {
+                        const enName = cells[0].textContent.trim();
+                        const storageStr = cells[1].textContent.trim().replace(/[^\d.]/g, '');
+                        const percentStr = cells[2].textContent.trim().replace('%', '');
+                        const storage = parseFloat(storageStr) || 0;
+                        const percent = parseFloat(percentStr) || 0;
+                        const cnName = nameMap[enName];
+                        if (cnName) {
+                            const capacity = capacities[cnName] || 0;
+                            const cls = getClass(percent);
+                            fetchedData.push({name: cnName, storage, capacity, percent, cls});
+                            totalStorage += storage;
+                        }
+                    }
+                }
+
+                if (fetchedData.length > 0) {
+                    reservoirs = fetchedData;
+                    updateDOM(reservoirs);
+                    console.log('Fetch成功，數據數量:', fetchedData.length);
+                    return;
+                } else {
+                    throw new Error('無數據解析');
+                }
+            } catch (error) {
+                console.error('Fetch錯誤:', error);
+                // Fallback到靜態
+                reservoirs = fallbackData;
+                updateDOM(reservoirs);
+            }
+        }
+
+        // 初始載入同自動更新
+        fetchData();
+        setInterval(fetchData, 600000); // 每10分鐘
+    </script>
+</body>
+</html>
+```
